@@ -31,5 +31,12 @@ def generate_launch_description():
                 output="screen",
                 parameters=[params_file],
             ),
+            Node(
+                package="et_astlf_path_tracking",
+                executable="error_plotter_node",
+                name="error_plotter_node",
+                output="screen",
+                parameters=[params_file],
+            ),
         ]
     )

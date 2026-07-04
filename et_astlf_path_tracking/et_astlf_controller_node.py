@@ -6,6 +6,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry, Path
 from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
 
 from et_astlf_path_tracking.astlf_math import (
     ASTLFController,
@@ -42,6 +43,7 @@ class ETASTLFControllerNode(Node):
         self.use_event_trigger = bool(self.get_parameter("use_event_trigger").value)
         self.wheelbase = float(self.get_parameter("wheelbase").value)
         self.goal_tolerance = float(self.get_parameter("goal_tolerance").value)
+        self.publish_debug = bool(self.get_parameter("publish_debug").value)
         self.cmd_output_type = str(self.get_parameter("cmd_output_type").value).lower()
         if self.cmd_output_type not in ("twist", "ackermann", "both"):
             self.get_logger().warn(
@@ -74,10 +76,13 @@ class ETASTLFControllerNode(Node):
 
         self.cmd_pub = None
         self.cmd_vel_pub = None
+        self.debug_pub = None
         if self.cmd_output_type in ("ackermann", "both"):
             self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/ackermann_cmd", 10)
         if self.cmd_output_type in ("twist", "both"):
             self.cmd_vel_pub = self.create_publisher(Twist, "/cmd_vel", 10)
+        if self.publish_debug:
+            self.debug_pub = self.create_publisher(Float64MultiArray, "/et_astlf/debug", 10)
         self.create_subscription(Odometry, "/odom", self._on_odom, 10)
         self.create_subscription(Path, "/reference_path", self._on_reference_path, 10)
 
@@ -114,6 +119,7 @@ class ETASTLFControllerNode(Node):
         self.declare_parameter("use_event_trigger", False)
         self.declare_parameter("lookahead_distance", 0.6)
         self.declare_parameter("goal_tolerance", 0.20)
+        self.declare_parameter("publish_debug", True)
         self.declare_parameter("cmd_output_type", "twist")
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -163,6 +169,8 @@ class ETASTLFControllerNode(Node):
         los = compute_lateral_error(x, y, target, theta_d)
         theta_os = angle_normalize(yaw - theta_d)
         output = self.controller.update(los, theta_os, speed_for_model, dt)
+        yaw_rate = steering_to_yaw_rate(self.target_speed, self.wheelbase, output.steering_angle)
+        self._publish_debug_sample(now_s, output, yaw_rate)
 
         if is_near_goal(self.reference_path, x, y, self.goal_tolerance):
             self._publish_stop_command()
@@ -203,6 +211,24 @@ class ETASTLFControllerNode(Node):
 
         if self.cmd_output_type in ("twist", "both") and self.cmd_vel_pub is not None:
             self.cmd_vel_pub.publish(Twist())
+
+    def _publish_debug_sample(self, now_s: float, output, yaw_rate: float) -> None:
+        if self.debug_pub is None:
+            return
+        msg = Float64MultiArray()
+        msg.data = [
+            now_s,
+            output.lateral_error,
+            output.heading_error,
+            output.sliding,
+            output.beta1,
+            output.beta2,
+            output.u,
+            output.steering_angle,
+            self.target_speed,
+            yaw_rate,
+        ]
+        self.debug_pub.publish(msg)
 
     def _compute_dt(self, now_s: float) -> float:
         nominal_dt = 1.0 / max(self.control_rate, 1.0)

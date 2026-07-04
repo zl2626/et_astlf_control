@@ -66,6 +66,7 @@ Default values are in `config/et_astlf_params.yaml`.
 | `use_event_trigger` | `false` | Reserved ET-ASTLF switch. Current code runs continuous ASTLF. |
 | `lookahead_distance` | `0.6` | Distance forward from nearest path point to select the tracking target. |
 | `goal_tolerance` | `0.20` | Stop when the robot is within this distance of the final path point. |
+| `publish_debug` | `true` | Publish `/et_astlf/debug` samples for plotting. |
 | `cmd_output_type` | `twist` | Command output mode: `twist`, `ackermann`, or `both`. Wheeltec moves with `/cmd_vel`, so the default is `twist`. |
 
 U path publisher parameters:
@@ -78,6 +79,14 @@ U path publisher parameters:
 | `point_spacing` | `0.10` | Distance between generated path points in meters. |
 | `publish_rate` | `2.0` | Rate for republishing `/reference_path`. |
 
+Plotter parameters:
+
+| Parameter | Default | Meaning |
+| --- | ---: | --- |
+| `plot_output_dir` | `/root/astlf_plots` | Directory where PNG plots are saved. |
+| `plot_window_s` | `60.0` | Rolling time window shown in the plot. |
+| `plot_save_period_s` | `2.0` | Seconds between PNG updates. |
+
 ## Build
 
 Install the Ackermann message package if needed:
@@ -85,6 +94,13 @@ Install the Ackermann message package if needed:
 ```bash
 sudo apt update
 sudo apt install ros-humble-ackermann-msgs
+```
+
+For saved PNG curves on the robot/container, install matplotlib if it is missing:
+
+```bash
+apt update
+apt install -y python3-matplotlib
 ```
 
 Build in a ROS2 Humble workspace:
@@ -131,6 +147,18 @@ ros2 launch et_astlf_path_tracking u_path_controller.launch.py
 ```
 
 The U path publisher waits for `/odom`, generates a U-shaped path from the robot's current pose, and continuously publishes it on `/reference_path`. The controller controls speed by publishing `/cmd_vel`.
+
+The launch also starts `error_plotter_node`. It subscribes to `/et_astlf/debug` and updates:
+
+```text
+/root/astlf_plots/astlf_error_curves.png
+```
+
+The image contains lateral error `Los`, heading error `theta_os`, sliding surface `s`, steering angle `delta_f`, and command yaw rate. From the host machine, copy it out with:
+
+```bash
+scp wheeltec@192.168.5.100:/root/astlf_plots/astlf_error_curves.png .
+```
 
 Emergency stop:
 

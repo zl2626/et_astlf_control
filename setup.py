@@ -25,6 +25,7 @@ setup(
         "console_scripts": [
             "et_astlf_controller_node = et_astlf_path_tracking.et_astlf_controller_node:main",
             "u_path_publisher_node = et_astlf_path_tracking.u_path_publisher_node:main",
+            "error_plotter_node = et_astlf_path_tracking.error_plotter_node:main",
         ],
     },
 )
