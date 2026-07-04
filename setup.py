@@ -10,7 +10,10 @@ setup(
         ("share/ament_index/resource_index/packages", [f"resource/{package_name}"]),
         (f"share/{package_name}", ["package.xml", "README.md"]),
         (f"share/{package_name}/config", ["config/et_astlf_params.yaml"]),
-        (f"share/{package_name}/launch", ["launch/et_astlf_controller.launch.py"]),
+        (
+            f"share/{package_name}/launch",
+            ["launch/et_astlf_controller.launch.py", "launch/u_path_controller.launch.py"],
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -21,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "et_astlf_controller_node = et_astlf_path_tracking.et_astlf_controller_node:main",
+            "u_path_publisher_node = et_astlf_path_tracking.u_path_publisher_node:main",
         ],
     },
 )

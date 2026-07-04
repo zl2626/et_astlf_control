@@ -65,7 +65,18 @@ Default values are in `config/et_astlf_params.yaml`.
 | `beta1_init` | `4.48` | Initial adaptive gain. |
 | `use_event_trigger` | `false` | Reserved ET-ASTLF switch. Current code runs continuous ASTLF. |
 | `lookahead_distance` | `0.6` | Distance forward from nearest path point to select the tracking target. |
+| `goal_tolerance` | `0.20` | Stop when the robot is within this distance of the final path point. |
 | `cmd_output_type` | `twist` | Command output mode: `twist`, `ackermann`, or `both`. Wheeltec moves with `/cmd_vel`, so the default is `twist`. |
+
+U path publisher parameters:
+
+| Parameter | Default | Meaning |
+| --- | ---: | --- |
+| `frame_id` | `odom` | Frame used for the generated `/reference_path`. |
+| `straight_length` | `2.0` | Length of each straight part of the U path in meters. |
+| `track_width` | `1.0` | Distance between the two straight tracks in meters. |
+| `point_spacing` | `0.10` | Distance between generated path points in meters. |
+| `publish_rate` | `2.0` | Rate for republishing `/reference_path`. |
 
 ## Build
 
@@ -94,6 +105,12 @@ Run:
 ros2 launch et_astlf_path_tracking et_astlf_controller.launch.py
 ```
 
+Run controller plus a generated U-shaped test path:
+
+```bash
+ros2 launch et_astlf_path_tracking u_path_controller.launch.py
+```
+
 Run with a custom parameter file:
 
 ```bash
@@ -104,6 +121,24 @@ ros2 launch et_astlf_path_tracking et_astlf_controller.launch.py \
 ## Path Handling
 
 The node finds the nearest point in `/reference_path`, then walks forward along the path by `lookahead_distance`. The reference heading `theta_d` is computed from the selected target point to the next path point with `atan2`. At the end of the path, it uses the previous point.
+
+## U Path Test
+
+For first real-vehicle testing, start the Wheeltec base first, then run:
+
+```bash
+ros2 launch et_astlf_path_tracking u_path_controller.launch.py
+```
+
+The U path publisher waits for `/odom`, generates a U-shaped path from the robot's current pose, and continuously publishes it on `/reference_path`. The controller controls speed by publishing `/cmd_vel`.
+
+Emergency stop:
+
+```bash
+ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}"
+```
+
+Press `Ctrl+C` after the robot stops.
 
 ## Wheeltec Command Output
 
@@ -132,6 +167,7 @@ The node includes protections for:
 
 - missing `/odom`
 - empty `/reference_path`
+- reaching the final path point
 - abnormal or non-positive `dt`
 - odometry speed close to zero
 - invalid steering commands through saturation

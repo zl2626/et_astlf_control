@@ -15,6 +15,7 @@ from et_astlf_path_tracking.astlf_math import (
     compute_lateral_error,
     compute_reference_heading,
     find_lookahead_target_index,
+    is_near_goal,
     steering_to_yaw_rate,
     yaw_from_quaternion,
 )
@@ -40,6 +41,7 @@ class ETASTLFControllerNode(Node):
         self.lookahead_distance = float(self.get_parameter("lookahead_distance").value)
         self.use_event_trigger = bool(self.get_parameter("use_event_trigger").value)
         self.wheelbase = float(self.get_parameter("wheelbase").value)
+        self.goal_tolerance = float(self.get_parameter("goal_tolerance").value)
         self.cmd_output_type = str(self.get_parameter("cmd_output_type").value).lower()
         if self.cmd_output_type not in ("twist", "ackermann", "both"):
             self.get_logger().warn(
@@ -66,6 +68,7 @@ class ETASTLFControllerNode(Node):
         self.reference_path: List[PathPoint] = []
         self.last_control_time_s: Optional[float] = None
         self.last_debug_log_s = 0.0
+        self.last_goal_log_s = 0.0
         self.warned_missing_odom = False
         self.warned_missing_path = False
 
@@ -110,6 +113,7 @@ class ETASTLFControllerNode(Node):
         self.declare_parameter("beta1_init", 4.48)
         self.declare_parameter("use_event_trigger", False)
         self.declare_parameter("lookahead_distance", 0.6)
+        self.declare_parameter("goal_tolerance", 0.20)
         self.declare_parameter("cmd_output_type", "twist")
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -160,6 +164,13 @@ class ETASTLFControllerNode(Node):
         theta_os = angle_normalize(yaw - theta_d)
         output = self.controller.update(los, theta_os, speed_for_model, dt)
 
+        if is_near_goal(self.reference_path, x, y, self.goal_tolerance):
+            self._publish_stop_command()
+            if now_s - self.last_goal_log_s >= 1.0:
+                self.last_goal_log_s = now_s
+                self.get_logger().info("Goal reached; publishing zero /cmd_vel.")
+            return
+
         self._publish_control_command(output.steering_angle)
 
         self._log_debug(now_s, output)
@@ -180,6 +191,18 @@ class ETASTLFControllerNode(Node):
             twist.angular.z = steering_to_yaw_rate(self.target_speed, self.wheelbase, steering_angle)
             if self.cmd_vel_pub is not None:
                 self.cmd_vel_pub.publish(twist)
+
+    def _publish_stop_command(self) -> None:
+        if self.cmd_output_type in ("ackermann", "both") and self.cmd_pub is not None:
+            cmd = AckermannDriveStamped()
+            cmd.header.stamp = self.get_clock().now().to_msg()
+            cmd.header.frame_id = "base_link"
+            cmd.drive.speed = 0.0
+            cmd.drive.steering_angle = 0.0
+            self.cmd_pub.publish(cmd)
+
+        if self.cmd_output_type in ("twist", "both") and self.cmd_vel_pub is not None:
+            self.cmd_vel_pub.publish(Twist())
 
     def _compute_dt(self, now_s: float) -> float:
         nominal_dt = 1.0 / max(self.control_rate, 1.0)

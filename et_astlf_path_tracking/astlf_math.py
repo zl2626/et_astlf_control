@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Sequence
+from typing import List, Sequence
 
 
 SMALL_NUMBER = 1.0e-12
@@ -143,6 +143,58 @@ def steering_to_yaw_rate(speed: float, wheelbase: float, steering_angle: float) 
     if not math.isfinite(speed) or not math.isfinite(steering_angle):
         return 0.0
     return speed / wheelbase * math.tan(steering_angle)
+
+
+def generate_u_shape_path(
+    start_x: float,
+    start_y: float,
+    start_yaw: float,
+    straight_length: float,
+    track_width: float,
+    point_spacing: float,
+) -> List[PathPoint]:
+    """Generate a left-turn U path in odom/map coordinates from the current vehicle pose."""
+    straight_length = max(point_spacing, straight_length)
+    track_width = max(point_spacing, track_width)
+    point_spacing = max(0.05, point_spacing)
+    radius = track_width / 2.0
+
+    local_points: List[PathPoint] = []
+    forward_steps = max(1, int(math.ceil(straight_length / point_spacing)))
+    for step in range(forward_steps + 1):
+        x_local = min(straight_length, step * point_spacing)
+        local_points.append(PathPoint(x_local, 0.0))
+
+    arc_length = math.pi * radius
+    arc_steps = max(4, int(math.ceil(arc_length / point_spacing)))
+    center_x = straight_length
+    center_y = radius
+    for step in range(1, arc_steps + 1):
+        angle = -math.pi / 2.0 + math.pi * step / arc_steps
+        x_local = center_x + radius * math.cos(angle)
+        y_local = center_y + radius * math.sin(angle)
+        local_points.append(PathPoint(x_local, y_local))
+
+    for step in range(1, forward_steps + 1):
+        x_local = max(0.0, straight_length - step * point_spacing)
+        local_points.append(PathPoint(x_local, track_width))
+
+    cos_yaw = math.cos(start_yaw)
+    sin_yaw = math.sin(start_yaw)
+    return [
+        PathPoint(
+            x=start_x + point.x * cos_yaw - point.y * sin_yaw,
+            y=start_y + point.x * sin_yaw + point.y * cos_yaw,
+        )
+        for point in local_points
+    ]
+
+
+def is_near_goal(path: Sequence[PathPoint], x: float, y: float, tolerance: float) -> bool:
+    if not path:
+        return False
+    goal = path[-1]
+    return math.hypot(goal.x - x, goal.y - y) <= max(0.0, tolerance)
 
 
 class ASTLFController:

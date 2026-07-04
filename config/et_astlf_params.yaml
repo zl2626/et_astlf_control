@@ -18,4 +18,14 @@ et_astlf_controller_node:
 
     use_event_trigger: false
     lookahead_distance: 0.6
+    goal_tolerance: 0.20
     cmd_output_type: twist
+
+u_path_publisher_node:
+  ros__parameters:
+    frame_id: odom
+    straight_length: 2.0
+    track_width: 1.0
+    point_spacing: 0.10
+    publish_rate: 2.0
+    regenerate_on_start: true

@@ -14,6 +14,8 @@ from et_astlf_path_tracking.astlf_math import (  # noqa: E402
     compute_lateral_error,
     compute_reference_heading,
     find_lookahead_target_index,
+    generate_u_shape_path,
+    is_near_goal,
     signed_power,
     steering_to_yaw_rate,
 )
@@ -73,6 +75,45 @@ def test_reference_heading_uses_target_and_next_point():
     path = [PathPoint(0.0, 0.0), PathPoint(1.0, 0.0), PathPoint(1.0, 1.0)]
 
     assert compute_reference_heading(path, 1) == pytest.approx(math.pi / 2.0)
+
+
+def test_generate_u_shape_path_starts_at_pose_and_returns_parallel():
+    path = generate_u_shape_path(
+        start_x=2.0,
+        start_y=3.0,
+        start_yaw=0.0,
+        straight_length=2.0,
+        track_width=1.0,
+        point_spacing=0.5,
+    )
+
+    assert path[0].x == pytest.approx(2.0)
+    assert path[0].y == pytest.approx(3.0)
+    assert path[-1].x == pytest.approx(2.0)
+    assert path[-1].y == pytest.approx(4.0)
+    assert len(path) >= 9
+
+
+def test_generate_u_shape_path_rotates_with_start_yaw():
+    path = generate_u_shape_path(
+        start_x=1.0,
+        start_y=1.0,
+        start_yaw=math.pi / 2.0,
+        straight_length=1.0,
+        track_width=1.0,
+        point_spacing=0.5,
+    )
+
+    assert path[1].x == pytest.approx(1.0)
+    assert path[1].y > 1.0
+    assert path[-1].x < 1.0
+
+
+def test_is_near_goal_uses_last_path_point():
+    path = [PathPoint(0.0, 0.0), PathPoint(2.0, 1.0)]
+
+    assert is_near_goal(path, x=2.05, y=1.02, tolerance=0.1) is True
+    assert is_near_goal(path, x=1.5, y=1.0, tolerance=0.1) is False
 
 
 def test_astlf_first_update_matches_requested_equations():
