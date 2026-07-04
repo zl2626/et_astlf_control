@@ -13,14 +13,14 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "params_file",
                 default_value=PathJoinSubstitution(
-                    [FindPackageShare("et_astlf_control"), "config", "et_astlf_params.yaml"]
+                    [FindPackageShare("et_astlf_path_tracking"), "config", "et_astlf_params.yaml"]
                 ),
-                description="Path to ET-ASTLF controller parameter file.",
+                description="Path to the ASTLF controller parameter file.",
             ),
             Node(
-                package="et_astlf_control",
-                executable="et_astlf_node",
-                name="et_astlf_node",
+                package="et_astlf_path_tracking",
+                executable="et_astlf_controller_node",
+                name="et_astlf_controller_node",
                 output="screen",
                 parameters=[params_file],
             ),

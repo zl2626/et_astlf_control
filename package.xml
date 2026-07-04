@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>et_astlf_control</name>
+  <name>et_astlf_path_tracking</name>
   <version>0.1.0</version>
-  <description>Event-triggered adaptive super-twisting-like fractional path tracking controller for Ackermann vehicles.</description>
+  <description>ASTLF path-tracking controller with reserved ET-ASTLF interface for Ackermann vehicles.</description>
   <maintainer email="user@example.com">ros2 vehicle user</maintainer>
   <license>MIT</license>
 
