@@ -1,0 +1,30 @@
+et_astlf_node:
+  ros__parameters:
+    odom_topic: /odom
+    path_topic: /path
+    cmd_topic: /ackermann_cmd
+    debug_topic: /et_astlf/debug
+    publish_debug: true
+    control_rate_hz: 50.0
+    reference_lookahead_m: 0.0
+
+    wheelbase_m: 2.5
+    speed_mps: 1.0
+    max_steering_angle_rad: 0.471238898
+    c1: 0.3
+    c2: 1.0
+    epsilon: -0.42
+    sigma: 0.4
+    gamma: 0.2
+    super_twisting_c: 0.18
+    mu1: 0.02
+    mu0: 0.02
+    beta1_min: 4.0
+    beta1_initial: 4.48
+
+csv_path_publisher:
+  ros__parameters:
+    csv_file: ""
+    path_topic: /path
+    frame_id: map
+    publish_rate_hz: 1.0
