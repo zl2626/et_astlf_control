@@ -136,6 +136,15 @@ def yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
     return math.atan2(siny_cosp, cosy_cosp)
 
 
+def steering_to_yaw_rate(speed: float, wheelbase: float, steering_angle: float) -> float:
+    """Convert steering angle to angular velocity with theta_dot = v / L * tan(delta_f)."""
+    if wheelbase <= SMALL_NUMBER or not math.isfinite(wheelbase):
+        return 0.0
+    if not math.isfinite(speed) or not math.isfinite(steering_angle):
+        return 0.0
+    return speed / wheelbase * math.tan(steering_angle)
+
+
 class ASTLFController:
     """Discrete continuous-time ASTLF controller without event triggering."""
 

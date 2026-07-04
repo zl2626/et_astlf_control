@@ -15,6 +15,7 @@ from et_astlf_path_tracking.astlf_math import (  # noqa: E402
     compute_reference_heading,
     find_lookahead_target_index,
     signed_power,
+    steering_to_yaw_rate,
 )
 
 
@@ -102,6 +103,17 @@ def test_astlf_limits_steering_after_atan_conversion():
 
     assert output.steering_angle == pytest.approx(-0.2)
     assert output.u == pytest.approx(-math.tan(0.2))
+
+
+def test_steering_to_yaw_rate_uses_bicycle_model():
+    yaw_rate = steering_to_yaw_rate(speed=0.5, wheelbase=0.32, steering_angle=0.2)
+
+    assert yaw_rate == pytest.approx(0.5 / 0.32 * math.tan(0.2))
+
+
+def test_steering_to_yaw_rate_returns_zero_for_invalid_wheelbase():
+    assert steering_to_yaw_rate(speed=0.5, wheelbase=0.0, steering_angle=0.2) == 0.0
+    assert steering_to_yaw_rate(speed=0.5, wheelbase=-0.1, steering_angle=0.2) == 0.0
 
 
 def test_beta1_decreases_only_to_minimum_then_uses_mu0_when_at_minimum():

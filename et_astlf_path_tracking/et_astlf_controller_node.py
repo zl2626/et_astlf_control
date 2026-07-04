@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry, Path
 from rclpy.node import Node
 
@@ -14,6 +15,7 @@ from et_astlf_path_tracking.astlf_math import (
     compute_lateral_error,
     compute_reference_heading,
     find_lookahead_target_index,
+    steering_to_yaw_rate,
     yaw_from_quaternion,
 )
 
@@ -37,6 +39,13 @@ class ETASTLFControllerNode(Node):
         self.control_rate = float(self.get_parameter("control_rate").value)
         self.lookahead_distance = float(self.get_parameter("lookahead_distance").value)
         self.use_event_trigger = bool(self.get_parameter("use_event_trigger").value)
+        self.wheelbase = float(self.get_parameter("wheelbase").value)
+        self.cmd_output_type = str(self.get_parameter("cmd_output_type").value).lower()
+        if self.cmd_output_type not in ("twist", "ackermann", "both"):
+            self.get_logger().warn(
+                f"Unsupported cmd_output_type={self.cmd_output_type}; falling back to twist output."
+            )
+            self.cmd_output_type = "twist"
 
         params = ASTLFParams(
             c1=float(self.get_parameter("c1").value),
@@ -60,7 +69,12 @@ class ETASTLFControllerNode(Node):
         self.warned_missing_odom = False
         self.warned_missing_path = False
 
-        self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/ackermann_cmd", 10)
+        self.cmd_pub = None
+        self.cmd_vel_pub = None
+        if self.cmd_output_type in ("ackermann", "both"):
+            self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/ackermann_cmd", 10)
+        if self.cmd_output_type in ("twist", "both"):
+            self.cmd_vel_pub = self.create_publisher(Twist, "/cmd_vel", 10)
         self.create_subscription(Odometry, "/odom", self._on_odom, 10)
         self.create_subscription(Path, "/reference_path", self._on_reference_path, 10)
 
@@ -74,7 +88,8 @@ class ETASTLFControllerNode(Node):
             )
 
         self.get_logger().info(
-            "ASTLF controller started: /odom + /reference_path -> /ackermann_cmd, "
+            "ASTLF controller started: /odom + /reference_path -> control command, "
+            f"cmd_output_type={self.cmd_output_type}, "
             f"target_speed={self.target_speed:.3f} m/s, lookahead={self.lookahead_distance:.3f} m"
         )
 
@@ -95,6 +110,7 @@ class ETASTLFControllerNode(Node):
         self.declare_parameter("beta1_init", 4.48)
         self.declare_parameter("use_event_trigger", False)
         self.declare_parameter("lookahead_distance", 0.6)
+        self.declare_parameter("cmd_output_type", "twist")
 
     def _on_odom(self, msg: Odometry) -> None:
         self.latest_odom = msg
@@ -109,13 +125,13 @@ class ETASTLFControllerNode(Node):
     def _control_timer_callback(self) -> None:
         if self.latest_odom is None:
             if not self.warned_missing_odom:
-                self.get_logger().warn("Waiting for /odom before publishing /ackermann_cmd.")
+                self.get_logger().warn("Waiting for /odom before publishing control command.")
                 self.warned_missing_odom = True
             return
 
         if not self.reference_path:
             if not self.warned_missing_path:
-                self.get_logger().warn("Waiting for non-empty /reference_path before publishing /ackermann_cmd.")
+                self.get_logger().warn("Waiting for non-empty /reference_path before publishing control command.")
                 self.warned_missing_path = True
             return
 
@@ -144,14 +160,26 @@ class ETASTLFControllerNode(Node):
         theta_os = angle_normalize(yaw - theta_d)
         output = self.controller.update(los, theta_os, speed_for_model, dt)
 
-        cmd = AckermannDriveStamped()
-        cmd.header.stamp = self.get_clock().now().to_msg()
-        cmd.header.frame_id = "base_link"
-        cmd.drive.speed = self.target_speed
-        cmd.drive.steering_angle = output.steering_angle
-        self.cmd_pub.publish(cmd)
+        self._publish_control_command(output.steering_angle)
 
         self._log_debug(now_s, output)
+
+    def _publish_control_command(self, steering_angle: float) -> None:
+        if self.cmd_output_type in ("ackermann", "both"):
+            cmd = AckermannDriveStamped()
+            cmd.header.stamp = self.get_clock().now().to_msg()
+            cmd.header.frame_id = "base_link"
+            cmd.drive.speed = self.target_speed
+            cmd.drive.steering_angle = steering_angle
+            if self.cmd_pub is not None:
+                self.cmd_pub.publish(cmd)
+
+        if self.cmd_output_type in ("twist", "both"):
+            twist = Twist()
+            twist.linear.x = self.target_speed
+            twist.angular.z = steering_to_yaw_rate(self.target_speed, self.wheelbase, steering_angle)
+            if self.cmd_vel_pub is not None:
+                self.cmd_vel_pub.publish(twist)
 
     def _compute_dt(self, now_s: float) -> float:
         nominal_dt = 1.0 / max(self.control_rate, 1.0)

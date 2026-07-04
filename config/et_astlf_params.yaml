@@ -18,3 +18,4 @@ et_astlf_controller_node:
 
     use_event_trigger: false
     lookahead_distance: 0.6
+    cmd_output_type: twist

@@ -40,7 +40,8 @@ Subscriptions:
 
 Publication:
 
-- `/ackermann_cmd`: `ackermann_msgs/msg/AckermannDriveStamped`
+- `/cmd_vel`: `geometry_msgs/msg/Twist` by default for Wheeltec chassis control
+- `/ackermann_cmd`: `ackermann_msgs/msg/AckermannDriveStamped` when `cmd_output_type` is `ackermann` or `both`
 
 ## Parameters
 
@@ -64,6 +65,7 @@ Default values are in `config/et_astlf_params.yaml`.
 | `beta1_init` | `4.48` | Initial adaptive gain. |
 | `use_event_trigger` | `false` | Reserved ET-ASTLF switch. Current code runs continuous ASTLF. |
 | `lookahead_distance` | `0.6` | Distance forward from nearest path point to select the tracking target. |
+| `cmd_output_type` | `twist` | Command output mode: `twist`, `ackermann`, or `both`. Wheeltec moves with `/cmd_vel`, so the default is `twist`. |
 
 ## Build
 
@@ -102,6 +104,27 @@ ros2 launch et_astlf_path_tracking et_astlf_controller.launch.py \
 ## Path Handling
 
 The node finds the nearest point in `/reference_path`, then walks forward along the path by `lookahead_distance`. The reference heading `theta_d` is computed from the selected target point to the next path point with `atan2`. At the end of the path, it uses the previous point.
+
+## Wheeltec Command Output
+
+The Wheeltec chassis tested here moves when receiving `/cmd_vel` as `geometry_msgs/msg/Twist`. The controller therefore publishes Twist by default:
+
+```text
+linear.x = target_speed
+angular.z = target_speed / wheelbase * tan(delta_f)
+```
+
+If another Ackermann chassis consumes `ackermann_msgs/msg/AckermannDriveStamped`, set:
+
+```yaml
+cmd_output_type: ackermann
+```
+
+To publish both `/cmd_vel` and `/ackermann_cmd`, set:
+
+```yaml
+cmd_output_type: both
+```
 
 ## Safety Guards
 
