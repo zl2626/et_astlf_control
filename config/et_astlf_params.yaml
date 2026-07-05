@@ -23,6 +23,7 @@ et_astlf_controller_node:
     save_error_plot_on_shutdown: true
     plot_output_dir: /root/astlf_plots
     plot_window_s: 600.0
+    plot_save_period_s: 1.0
     cmd_output_type: twist
 
 u_path_publisher_node:
@@ -38,4 +39,4 @@ error_plotter_node:
   ros__parameters:
     plot_output_dir: /root/astlf_plots
     plot_window_s: 600.0
-    plot_save_period_s: 2.0
+    plot_save_period_s: 1.0

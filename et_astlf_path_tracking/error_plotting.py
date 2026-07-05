@@ -69,19 +69,29 @@ def save_error_plot(
     during shutdown, and the plotter node can call it periodically.
     """
 
-    if len(history.samples) < 2:
-        return None
-
     output_path = Path(output_dir).expanduser() / filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt = pyplot if pyplot is not None else _load_pyplot()
 
+    fig, axes = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+    fig.suptitle("ASTLF path-tracking debug curves")
+
+    if not history.samples:
+        fig.text(
+            0.5,
+            0.5,
+            "No ASTLF samples recorded yet.\nCheck /odom and /reference_path, then run the controller again.",
+            ha="center",
+            va="center",
+        )
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=130)
+        plt.close(fig)
+        return output_path
+
     times = history.series("time_s")
     start_time = times[0]
     t = [item - start_time for item in times]
-
-    fig, axes = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
-    fig.suptitle("ASTLF path-tracking debug curves")
 
     axes[0].plot(t, history.series("lateral_error"), label="Los (m)")
     axes[0].axhline(0.0, color="black", linewidth=0.7)

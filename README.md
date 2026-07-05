@@ -70,6 +70,7 @@ Default values are in `config/et_astlf_params.yaml`.
 | `save_error_plot_on_shutdown` | `true` | Save the final error plot when the controller exits, including when you press `Ctrl+C`. |
 | `plot_output_dir` | `/root/astlf_plots` | Directory where the controller saves the final PNG plot. |
 | `plot_window_s` | `600.0` | Time window kept in controller memory for the final plot. |
+| `plot_save_period_s` | `1.0` | Seconds between controller-side PNG saves during the run. |
 | `cmd_output_type` | `twist` | Command output mode: `twist`, `ackermann`, or `both`. Wheeltec moves with `/cmd_vel`, so the default is `twist`. |
 
 U path publisher parameters:
@@ -88,7 +89,7 @@ Plotter parameters:
 | --- | ---: | --- |
 | `plot_output_dir` | `/root/astlf_plots` | Directory where PNG plots are saved. |
 | `plot_window_s` | `600.0` | Rolling time window shown in the plot. |
-| `plot_save_period_s` | `2.0` | Seconds between PNG updates. |
+| `plot_save_period_s` | `1.0` | Seconds between PNG updates. |
 
 ## Build
 
@@ -151,13 +152,13 @@ ros2 launch et_astlf_path_tracking u_path_controller.launch.py
 
 The U path publisher waits for `/odom`, generates a U-shaped path from the robot's current pose, and continuously publishes it on `/reference_path`. The controller controls speed by publishing `/cmd_vel`.
 
-The controller records tracking error samples while it runs. When you stop the launch with `Ctrl+C`, it saves the final error figure here:
+The controller records tracking error samples while it runs and writes the PNG about once per second. When you stop the launch with `Ctrl+C`, it saves the final error figure here:
 
 ```text
 /root/astlf_plots/astlf_error_curves.png
 ```
 
-The image contains lateral error `Los`, heading error `theta_os`, sliding surface `s`, steering angle `delta_f`, and command yaw rate. If you also want the PNG to refresh during the run, start the optional plotter:
+The image contains lateral error `Los`, heading error `theta_os`, sliding surface `s`, steering angle `delta_f`, and command yaw rate. Even a very short run creates a PNG; if no samples were recorded yet, the image contains a diagnostic message. If you also want a separate plotter node to subscribe to `/et_astlf/debug`, start it with:
 
 ```bash
 ros2 launch et_astlf_path_tracking u_path_controller.launch.py start_plotter:=true

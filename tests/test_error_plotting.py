@@ -27,9 +27,15 @@ class _FakeAxis:
     def grid(self, *args, **kwargs):
         return None
 
+    def text(self, *args, **kwargs):
+        return None
+
 
 class _FakeFigure:
     def suptitle(self, *args, **kwargs):
+        return None
+
+    def text(self, *args, **kwargs):
         return None
 
     def tight_layout(self):
@@ -85,8 +91,18 @@ def test_save_error_plot_writes_png_to_output_directory(tmp_path):
     assert output_path.read_bytes() == b"fake-png"
 
 
-def test_save_error_plot_skips_when_not_enough_samples(tmp_path):
+def test_save_error_plot_writes_png_with_one_sample(tmp_path):
     history = ErrorHistory(window_s=10.0)
     history.add(parse_debug_sample([0.0, 0.2, 0.1, 0.3, 4.0, 0.8, 0.5, 0.1, 0.5, 0.15]))
 
-    assert save_error_plot(history, tmp_path / "plots", pyplot=_FakePyplot()) is None
+    output_path = save_error_plot(history, tmp_path / "plots", pyplot=_FakePyplot())
+
+    assert output_path == tmp_path / "plots" / "astlf_error_curves.png"
+    assert output_path.read_bytes() == b"fake-png"
+
+
+def test_save_error_plot_writes_png_without_samples(tmp_path):
+    output_path = save_error_plot(ErrorHistory(window_s=10.0), tmp_path / "plots", pyplot=_FakePyplot())
+
+    assert output_path == tmp_path / "plots" / "astlf_error_curves.png"
+    assert output_path.read_bytes() == b"fake-png"

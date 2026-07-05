@@ -48,6 +48,7 @@ class ETASTLFControllerNode(Node):
         self.publish_debug = bool(self.get_parameter("publish_debug").value)
         self.save_error_plot_on_shutdown = bool(self.get_parameter("save_error_plot_on_shutdown").value)
         self.plot_output_dir = FilePath(str(self.get_parameter("plot_output_dir").value)).expanduser()
+        self.plot_save_period_s = max(0.2, float(self.get_parameter("plot_save_period_s").value))
         self.cmd_output_type = str(self.get_parameter("cmd_output_type").value).lower()
         if self.cmd_output_type not in ("twist", "ackermann", "both"):
             self.get_logger().warn(
@@ -77,6 +78,7 @@ class ETASTLFControllerNode(Node):
         self.last_goal_log_s = 0.0
         self.warned_missing_odom = False
         self.warned_missing_path = False
+        self.warned_plot_failure = False
         self.error_history = ErrorHistory(float(self.get_parameter("plot_window_s").value))
 
         self.cmd_pub = None
@@ -93,6 +95,7 @@ class ETASTLFControllerNode(Node):
 
         timer_period = 1.0 / max(self.control_rate, 1.0)
         self.create_timer(timer_period, self._control_timer_callback)
+        self.create_timer(self.plot_save_period_s, self._save_error_plot_timer_callback)
 
         if self.use_event_trigger:
             self.get_logger().warn(
@@ -128,6 +131,7 @@ class ETASTLFControllerNode(Node):
         self.declare_parameter("save_error_plot_on_shutdown", True)
         self.declare_parameter("plot_output_dir", "/root/astlf_plots")
         self.declare_parameter("plot_window_s", 600.0)
+        self.declare_parameter("plot_save_period_s", 1.0)
         self.declare_parameter("cmd_output_type", "twist")
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -256,19 +260,28 @@ class ETASTLFControllerNode(Node):
         if not self.save_error_plot_on_shutdown:
             return
 
+        output_path = self._save_error_plot()
+        if output_path is not None:
+            self.get_logger().info(f"Saved final ASTLF error plot: {output_path}")
+
+    def _save_error_plot_timer_callback(self) -> None:
+        if self.save_error_plot_on_shutdown:
+            self._save_error_plot()
+
+    def _save_error_plot(self):
         try:
             output_path = save_error_plot(self.error_history, self.plot_output_dir)
         except Exception as exc:  # pragma: no cover - depends on robot image packages
+            if self.warned_plot_failure:
+                return None
+            self.warned_plot_failure = True
             self.get_logger().error(
-                "Failed to save final ASTLF error plot. Install matplotlib with: "
+                "Failed to save ASTLF error plot. Install matplotlib with: "
                 f"apt install -y python3-matplotlib. Original error: {exc}"
             )
-            return
+            return None
 
-        if output_path is None:
-            self.get_logger().warn("No final ASTLF error plot saved because fewer than two samples were recorded.")
-            return
-        self.get_logger().info(f"Saved final ASTLF error plot: {output_path}")
+        return output_path
 
     def _compute_dt(self, now_s: float) -> float:
         nominal_dt = 1.0 / max(self.control_rate, 1.0)
