@@ -1,11 +1,11 @@
 import math
-from pathlib import Path
+from pathlib import Path as FilePath
 from typing import List, Optional
 
 import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry, Path
+from nav_msgs.msg import Odometry, Path as PathMsg
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray
 
@@ -47,7 +47,7 @@ class ETASTLFControllerNode(Node):
         self.goal_tolerance = float(self.get_parameter("goal_tolerance").value)
         self.publish_debug = bool(self.get_parameter("publish_debug").value)
         self.save_error_plot_on_shutdown = bool(self.get_parameter("save_error_plot_on_shutdown").value)
-        self.plot_output_dir = Path(str(self.get_parameter("plot_output_dir").value)).expanduser()
+        self.plot_output_dir = FilePath(str(self.get_parameter("plot_output_dir").value)).expanduser()
         self.cmd_output_type = str(self.get_parameter("cmd_output_type").value).lower()
         if self.cmd_output_type not in ("twist", "ackermann", "both"):
             self.get_logger().warn(
@@ -89,7 +89,7 @@ class ETASTLFControllerNode(Node):
         if self.publish_debug:
             self.debug_pub = self.create_publisher(Float64MultiArray, "/et_astlf/debug", 10)
         self.create_subscription(Odometry, "/odom", self._on_odom, 10)
-        self.create_subscription(Path, "/reference_path", self._on_reference_path, 10)
+        self.create_subscription(PathMsg, "/reference_path", self._on_reference_path, 10)
 
         timer_period = 1.0 / max(self.control_rate, 1.0)
         self.create_timer(timer_period, self._control_timer_callback)
@@ -134,7 +134,7 @@ class ETASTLFControllerNode(Node):
         self.latest_odom = msg
         self.warned_missing_odom = False
 
-    def _on_reference_path(self, msg: Path) -> None:
+    def _on_reference_path(self, msg: PathMsg) -> None:
         self.reference_path = [PathPoint(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
         self.warned_missing_path = False
         if not self.reference_path:
