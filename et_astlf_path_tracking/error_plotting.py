@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Sequence
+from pathlib import Path
+from typing import Any, List, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -45,3 +46,66 @@ def parse_debug_sample(values: Sequence[float]) -> ErrorSample:
         speed=float(values[8]),
         yaw_rate=float(values[9]),
     )
+
+
+def _load_pyplot() -> Any:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib import pyplot as plt
+
+    return plt
+
+
+def save_error_plot(
+    history: ErrorHistory,
+    output_dir: str | Path,
+    filename: str = "astlf_error_curves.png",
+    pyplot: Optional[Any] = None,
+) -> Optional[Path]:
+    """Save ASTLF tracking error curves and return the PNG path.
+
+    The function is kept independent from ROS so the controller can call it
+    during shutdown, and the plotter node can call it periodically.
+    """
+
+    if len(history.samples) < 2:
+        return None
+
+    output_path = Path(output_dir).expanduser() / filename
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt = pyplot if pyplot is not None else _load_pyplot()
+
+    times = history.series("time_s")
+    start_time = times[0]
+    t = [item - start_time for item in times]
+
+    fig, axes = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+    fig.suptitle("ASTLF path-tracking debug curves")
+
+    axes[0].plot(t, history.series("lateral_error"), label="Los (m)")
+    axes[0].axhline(0.0, color="black", linewidth=0.7)
+    axes[0].set_ylabel("Los (m)")
+    axes[0].grid(True)
+
+    axes[1].plot(t, history.series("heading_error"), label="theta_os (rad)", color="tab:orange")
+    axes[1].axhline(0.0, color="black", linewidth=0.7)
+    axes[1].set_ylabel("theta_os")
+    axes[1].grid(True)
+
+    axes[2].plot(t, history.series("sliding"), label="s", color="tab:green")
+    axes[2].axhline(0.0, color="black", linewidth=0.7)
+    axes[2].set_ylabel("s")
+    axes[2].grid(True)
+
+    axes[3].plot(t, history.series("steering_angle"), label="delta_f (rad)", color="tab:red")
+    axes[3].plot(t, history.series("yaw_rate"), label="cmd angular.z", color="tab:purple")
+    axes[3].set_ylabel("command")
+    axes[3].set_xlabel("time (s)")
+    axes[3].legend(loc="upper right")
+    axes[3].grid(True)
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=130)
+    plt.close(fig)
+    return output_path

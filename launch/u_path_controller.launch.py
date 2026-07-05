@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -7,6 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     params_file = LaunchConfiguration("params_file")
+    start_plotter = LaunchConfiguration("start_plotter")
 
     return LaunchDescription(
         [
@@ -16,6 +18,11 @@ def generate_launch_description():
                     [FindPackageShare("et_astlf_path_tracking"), "config", "et_astlf_params.yaml"]
                 ),
                 description="Path to ASTLF controller and U path parameters.",
+            ),
+            DeclareLaunchArgument(
+                "start_plotter",
+                default_value="false",
+                description="Start the optional live PNG plotter node.",
             ),
             Node(
                 package="et_astlf_path_tracking",
@@ -37,6 +44,7 @@ def generate_launch_description():
                 name="error_plotter_node",
                 output="screen",
                 parameters=[params_file],
+                condition=IfCondition(start_plotter),
             ),
         ]
     )

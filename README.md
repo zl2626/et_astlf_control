@@ -67,6 +67,9 @@ Default values are in `config/et_astlf_params.yaml`.
 | `lookahead_distance` | `0.6` | Distance forward from nearest path point to select the tracking target. |
 | `goal_tolerance` | `0.20` | Stop when the robot is within this distance of the final path point. |
 | `publish_debug` | `true` | Publish `/et_astlf/debug` samples for plotting. |
+| `save_error_plot_on_shutdown` | `true` | Save the final error plot when the controller exits, including when you press `Ctrl+C`. |
+| `plot_output_dir` | `/root/astlf_plots` | Directory where the controller saves the final PNG plot. |
+| `plot_window_s` | `600.0` | Time window kept in controller memory for the final plot. |
 | `cmd_output_type` | `twist` | Command output mode: `twist`, `ackermann`, or `both`. Wheeltec moves with `/cmd_vel`, so the default is `twist`. |
 
 U path publisher parameters:
@@ -84,7 +87,7 @@ Plotter parameters:
 | Parameter | Default | Meaning |
 | --- | ---: | --- |
 | `plot_output_dir` | `/root/astlf_plots` | Directory where PNG plots are saved. |
-| `plot_window_s` | `60.0` | Rolling time window shown in the plot. |
+| `plot_window_s` | `600.0` | Rolling time window shown in the plot. |
 | `plot_save_period_s` | `2.0` | Seconds between PNG updates. |
 
 ## Build
@@ -148,17 +151,26 @@ ros2 launch et_astlf_path_tracking u_path_controller.launch.py
 
 The U path publisher waits for `/odom`, generates a U-shaped path from the robot's current pose, and continuously publishes it on `/reference_path`. The controller controls speed by publishing `/cmd_vel`.
 
-The launch also starts `error_plotter_node`. It subscribes to `/et_astlf/debug` and updates:
+The controller records tracking error samples while it runs. When you stop the launch with `Ctrl+C`, it saves the final error figure here:
 
 ```text
 /root/astlf_plots/astlf_error_curves.png
 ```
 
-The image contains lateral error `Los`, heading error `theta_os`, sliding surface `s`, steering angle `delta_f`, and command yaw rate. From the host machine, copy it out with:
+The image contains lateral error `Los`, heading error `theta_os`, sliding surface `s`, steering angle `delta_f`, and command yaw rate. If you also want the PNG to refresh during the run, start the optional plotter:
 
 ```bash
-scp wheeltec@192.168.5.100:/root/astlf_plots/astlf_error_curves.png .
+ros2 launch et_astlf_path_tracking u_path_controller.launch.py start_plotter:=true
 ```
+
+If `/root/astlf_plots` is inside the ROS2 Docker container, copy the plot from the host machine with:
+
+```bash
+docker ps
+docker cp <container_id>:/root/astlf_plots/astlf_error_curves.png ~/astlf_error_curves.png
+```
+
+If your container mounts `/root/astlf_plots` to the robot host filesystem, you can also copy it with `scp`.
 
 Emergency stop:
 
